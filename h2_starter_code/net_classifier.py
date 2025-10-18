@@ -37,8 +37,14 @@ def softmax(X):
         res: numpy array shape (n, d)  where each row is the softmax transformation of the corresponding row in X i.e res[i, :] = softmax(X[i, :])
     """
     res = np.zeros(X.shape)
+
     ### YOUR CODE HERE
+    max_X = np.amax(X, axis=1, keepdims=True)
+    log_sum_exp = np.log(np.sum(np.exp(X - max_X), axis=1, keepdims=True)) + max_X
+    log_softmax = X - log_sum_exp
+    res = np.exp(log_softmax)
     ### END CODE
+
     return res
 
 def relu(x):
@@ -51,6 +57,7 @@ def relu(x):
         Beware of np.max and look at np.maximum
     """
     ### YOUR CODE HERE
+    res = np.maximum(0, x)
     ### END CODE
     return res
 
@@ -96,6 +103,14 @@ class NetClassifier():
             params = self.params
         pred = None
         ### YOUR CODE HERE
+        W1 = params['W1']
+        b1 = params['b1']
+        W2 = params['W2']
+        b2 = params['b2']
+        hidden_layer = relu(np.dot(X, W1) + b1)  # shape (n, hidden_size)
+        output_layer = np.dot(hidden_layer, W2) + b2  # shape (n, output_size)
+        probabilities = softmax(output_layer)  # shape (n, output_size)
+        pred = np.argmax(probabilities, axis=1)  # shape (n,)
         ### END CODE
         return pred
      
@@ -114,6 +129,9 @@ class NetClassifier():
             params = self.params
         acc = None
         ### YOUR CODE HERE
+        predictions = self.predict(X, params)
+        acc = np.mean(predictions == y)
+
         ### END CODE
         return acc
     
@@ -153,9 +171,29 @@ class NetClassifier():
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
+        n = X.shape[0]
+        # Forward pass
+        z1 = np.dot(X, W1) + b1  # shape (n, hidden_size)
+        a1 = relu(z1)  # shape (n, hidden_size)
+        z2 = np.dot(a1, W2) + b2  # shape (n, output_size)
+        a2 = softmax(z2)  # shape (n    , output_size)  
+        # Compute cost
+        log_likelihood = -np.log(a2[np.arange(n), y])
+        data_loss = np.sum(log_likelihood) / n
+        weight_decay = (c / 2) * (np.sum(W1**2) + np.sum(W2**2))
+        cost = data_loss + weight_decay
         ### END CODE
         
         ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2, d_b1, d_b2
+        # Backward pass
+        delta2 = (a2 - labels) / n  # shape (n, output_size)
+        d_w2 = np.dot(a1.T, delta2) + c * W2  # shape (hidden_size, output_size)
+        d_b2 = np.sum(delta2, axis=0, keepdims=True)  # shape (1, output_size)  
+        delta1 = np.dot(delta2, W2.T)  # shape (n, hidden_size)
+        delta1[z1 <= 0] = 0  # Apply ReLU derivative
+        d_w1 = np.dot(X.T, delta1) + c * W1  # shape (input_size, hidden_size)
+        d_b1 = np.sum(delta1, axis=0, keepdims=True)  # shape (1, hidden_size)
+
         ### END CODE
         # the return signature
         return cost, {'d_w1': d_w1, 'd_w2': d_w2, 'd_b1': d_b1, 'd_b2': d_b2}
@@ -195,6 +233,44 @@ class NetClassifier():
 
         
         ### YOUR CODE HERE
+        n = X_train.shape[0]
+        train_loss = []
+        train_acc = []
+        val_loss = []
+        val_acc = []
+        params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}   
+        for epoch in range(epochs):
+            # Shuffle the training data
+            perm = np.random.permutation(n)
+            X_train_shuffled = X_train[perm]
+            y_train_shuffled = y_train[perm]
+            # Mini-batch gradient descent
+            for i in range(0, n, batch_size):
+                X_batch = X_train_shuffled[i:i+batch_size]
+                y_batch = y_train_shuffled[i:i+batch_size]
+                cost, grads = self.cost_grad(X_batch, y_batch, params, c)
+                # Update parameters
+                params['W1'] -= lr * grads['d_w1']
+                params['b1'] -= lr * grads['d_b1']
+                params['W2'] -= lr * grads['d_w2']
+                params['b2'] -= lr * grads['d_b2']
+            # Compute training loss and accuracy
+            train_cost, _ = self.cost_grad(X_train, y_train, params, c)
+            train_accuracy = self.score(X_train, y_train, params)
+            train_loss.append(train_cost)
+            train_acc.append(train_accuracy)
+            # Compute validation loss and accuracy
+            val_cost, _ = self.cost_grad(X_val, y_val, params, c)
+            val_accuracy = self.score(X_val, y_val, params)
+            val_loss.append(val_cost)
+            val_acc.append(val_accuracy)
+            print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_cost:.4f}, Train Acc: {train_accuracy:.4f}, Val Loss: {val_cost:.4f}, Val Acc: {val_accuracy:.4f}')
+        hist['train_loss'] = np.array(train_loss)
+        hist['train_acc'] = np.array(train_acc)
+        hist['val_loss'] = np.array(val_loss)
+        hist['val_acc'] = np.array(val_acc)
+        self.params = params
+        self.hist = hist    
         ### END CODE
         # hist dict should look like this with something different than none
         #hist = {'train_loss': None, 'train_acc': None, 'val_loss': None, 'val_acc': None}
