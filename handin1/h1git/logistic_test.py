@@ -56,7 +56,7 @@ def print_errors(classifier, feat, raw_feat, labels, class_names, top=10):
     print('*'*30)
 
 
-def branche_data_test(lr=0.1, batch_size=16, epochs=50):
+def branche_data_test(lr=0.1, batch_size=32, epochs=250):
     keys = [(561010, 'Restauranter'), (620100, 'Computerprogrammering')]
     feat_train, feat_test, y_train, y_test, cnames = get_branche_data(keys)
     c = CountVectorizer()

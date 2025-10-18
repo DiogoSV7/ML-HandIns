@@ -14,6 +14,9 @@ def logistic(z):
     """
     logi = np.zeros(z.shape)
     ### YOUR CODE HERE
+    for i in range(z.shape[0]):
+        logi[i] = 1 / (1 + np.exp(-z[i]))
+
     ### END CODE
     assert logi.shape == z.shape
     return logi
@@ -42,6 +45,19 @@ class LogisticRegressionClassifier():
         cost = 0
         grad = np.zeros(w.shape)
         ### YOUR CODE HERE
+        n = X.shape[0]
+        for i in range(n):
+            z = np.dot(X[i], w)
+            prob = logistic(np.array([z]))[0]
+            if y[i] == 1:
+                cost -= np.log(prob)
+                grad += (prob - 1) * X[i]
+            else:
+                cost -= np.log(1 - prob)
+                grad += prob * X[i]
+        cost /= n
+        grad /= n
+        
         ### END CODE
         assert grad.shape == w.shape
         return cost, grad
@@ -71,6 +87,18 @@ class LogisticRegressionClassifier():
         if w is None: w = np.zeros(X.shape[1])
         history = []        
         ### YOUR CODE HERE 
+        n = X.shape[0]
+        for epoch in range(epochs):
+            perm = np.random.permutation(n)
+            X_shuffled = X[perm]
+            y_shuffled = y[perm]
+            for i in range(0, n, batch_size):
+                X_batch = X_shuffled[i:i + batch_size]
+                y_batch = y_shuffled[i:i + batch_size]
+                cost, grad = self.cost_grad(X_batch, y_batch, w)
+                w -= lr * grad
+            epoch_cost, _ = self.cost_grad(X, y, w)
+            history.append(epoch_cost)
         ### END CODE
         self.w = w
         self.history = history
@@ -89,6 +117,8 @@ class LogisticRegressionClassifier():
         """
         out = np.ones(X.shape[0])
         ### YOUR CODE HERE
+        probabilities = logistic(X @ self.w)
+        out = np.where(probabilities >= 0.5, 1, -1)
         ### END CODE
         return out
     
@@ -105,6 +135,8 @@ class LogisticRegressionClassifier():
         """
         s = 0
         ### YOUR CODE HERE
+        predictions = self.predict(X)
+        s = np.mean(predictions == y)
         ### END CODE
         return s
         
